@@ -68,13 +68,15 @@
   </div>
 
   <!-- 交易列表 -->
-  <div class="card" v-if="response && response.trades" v-for="item in response.trades" :key="item.id">
+  <div class="card" v-if="response && response.trade" v-for="item in response.trade" :key="item.id">
     <div>
       <strong>买入时间：</strong>{{ item.buy_at }} <br/>
       <strong>买入单价：</strong>{{ item.buy_price }} 元 <br/>
       <strong>买入重量：</strong>{{ item.buy_weight }} 克 <br/>
+      <strong>买入金额：</strong>{{ item.buy_amount }} 元 <br/>
       <strong>已卖出：</strong>{{ item.sell_weight }} 克 <br/>
       <strong>可卖出：</strong>{{ item.available_weight }} 克 <br/>
+      <strong>已卖出金额：</strong>{{ item.sell_amount }} 元 <br/>
       <strong>盈亏：</strong>
       <span :class="item.color === 'red' ? 'profit-red' : 'profit-green'">
         {{ item.profit }} 元
@@ -87,10 +89,10 @@
     </div>
 
     <!-- 卖出记录 -->
-    <div v-if="item.sell_record.length > 0">
+    <div v-if="item.sell_records.length > 0">
       <h4>卖出记录：</h4>
       <ul>
-        <li v-for="r in item.sell_record">
+        <li v-for="r in item.sell_records">
           {{ r.sell_at }} - {{ r.sell_weight }} 克 x {{ r.sell_price }} 元 = {{ r.sell_amount }} 元
         </li>
       </ul>
@@ -119,7 +121,7 @@ createApp({
       latest_price: 0,
       total_profit: 0,
       total_sell_fees: 0,
-      trades: []
+      trade: []
     });
 
     const buyData = ref({ weight: '', price: '', amount: '' });
@@ -129,7 +131,7 @@ createApp({
 
     const fetchTrades = async () => {
       try {
-        const res = await axios.get("https://super-duper-waffle-g5wxrvqqrppfwx9r-8080.app.github.dev/list");
+        const res = await axios.get("http://127.0.0.1:8080/list");
         response.value = res.data;
       } catch (err) {
         alert("加载数据失败：" + err);
@@ -138,7 +140,7 @@ createApp({
 
     const buy = async () => {
       try {
-        await axios.post("https://super-duper-waffle-g5wxrvqqrppfwx9r-8080.app.github.dev/buy", {
+        await axios.post("http://127.0.0.1:8080/buy", {
           weight: Number(buyData.value.weight),
           price: Number(buyData.value.price),
           amount: Number(buyData.value.amount)
@@ -159,7 +161,7 @@ createApp({
 
     const sell = async () => {
       try {
-        await axios.post("https://super-duper-waffle-g5wxrvqqrppfwx9r-8080.app.github.dev/sell", {
+        await axios.post("http://127.0.0.1:8080/sell", {
           buy_ids: [sellTarget.value.id],
           weight: Number(sellTarget.value.weight),
           price: Number(sellTarget.value.price)

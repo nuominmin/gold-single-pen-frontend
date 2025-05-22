@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>黄金买卖记录</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 10px;
+      background-color: #f9f9f9;
+    }
+    .card {
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+    }
+    .profit-red { color: red; }
+    .profit-green { color: green; }
+    input {
+      width: 100%;
+      padding: 6px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 8px 16px;
+      margin-top: 5px;
+    }
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex; justify-content: center; align-items: center;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      width: 90%;
+      max-width: 400px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- 买入区域 -->
+  <div class="card">
+    <h3>买入黄金</h3>
+    <input v-model="buyData.weight" placeholder="重量（克）" type="number" />
+    <input v-model="buyData.price" placeholder="单价（元/克）" type="number" />
+    <input v-model="buyData.amount" placeholder="金额（元）" type="number" />
+    <button @click="buy">买入</button>
+  </div>
+
+  <!-- 最新金价 -->
+  <div class="card" v-if="response">
+    <strong>当前金价：</strong>{{ response.latest_price }} 元/克 <br/>
+    <strong>总盈亏：</strong>
+    <span :class="response.total_profit > 0 ? 'profit-red' : 'profit-green'">
+      {{ response.total_profit }} 元
+    </span><br/>
+    <strong>总手续费：</strong>{{ response.total_sell_fees }} 元
+  </div>
+
+  <!-- 交易列表 -->
+  <div class="card" v-if="response && response.trades" v-for="item in response.trades" :key="item.id">
+    <div>
+      <strong>买入时间：</strong>{{ item.buy_at }} <br/>
+      <strong>买入单价：</strong>{{ item.buy_price }} 元 <br/>
+      <strong>买入重量：</strong>{{ item.buy_weight }} 克 <br/>
+      <strong>已卖出：</strong>{{ item.sell_weight }} 克 <br/>
+      <strong>可卖出：</strong>{{ item.available_weight }} 克 <br/>
+      <strong>盈亏：</strong>
+      <span :class="item.color === 'red' ? 'profit-red' : 'profit-green'">
+        {{ item.profit }} 元
+      </span>
+    </div>
+
+    <!-- 卖出按钮 -->
+    <div v-if="item.available_weight > 0">
+      <button @click="openSellModal(item)">卖出</button>
+    </div>
+
+    <!-- 卖出记录 -->
+    <div v-if="item.sell_record.length > 0">
+      <h4>卖出记录：</h4>
+      <ul>
+        <li v-for="r in item.sell_record">
+          {{ r.sell_at }} - {{ r.sell_weight }} 克 x {{ r.sell_price }} 元 = {{ r.sell_amount }} 元
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 卖出弹窗 -->
+  <div class="modal" v-if="sellModalVisible">
+    <div class="modal-content">
+      <h3>卖出黄金</h3>
+      <p>可卖出：{{ sellTarget.available_weight }} 克</p>
+      <input v-model="sellForm.weight" type="number" placeholder="卖出重量" />
+      <input v-model="sellForm.price" type="number" placeholder="卖出单价" />
+      <button @click="sell">确认卖出</button>
+      <button @click="sellModalVisible = false">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, ref, onMounted } = Vue;
+
+createApp({
+  setup() {
+    const response = ref({
+      latest_price: 0,
+      total_profit: 0,
+      total_sell_fees: 0,
+      trades: []
+    });
+
+    const buyData = ref({ weight: '', price: '', amount: '' });
+    const sellModalVisible = ref(false);
+    const sellTarget = ref({});
+    const sellForm = ref({ weight: '', price: '' });
+
+    const fetchTrades = async () => {
+      try {
+        const res = await axios.get("https://super-duper-waffle-g5wxrvqqrppfwx9r-8080.app.github.dev/list");
+        response.value = res.data;
+      } catch (err) {
+        alert("加载数据失败：" + err);
+      }
+    };
+
+    const buy = async () => {
+      try {
+        await axios.post("https://super-duper-waffle-g5wxrvqqrppfwx9r-8080.app.github.dev/buy", {
+          weight: Number(buyData.value.weight),
+          price: Number(buyData.value.price),
+          amount: Number(buyData.value.amount)
+        });
+        alert("买入成功");
+        buyData.value = { weight: 0, price: 0, amount: 0 };
+        fetchTrades();
+      } catch (e) {
+        alert("买入失败: " + (e.response?.data?.error || e.message));
+      }
+    };
+
+    const openSellModal = (item) => {
+      sellTarget.value = item;
+      sellForm.value = { weight: '', price: '' };
+      sellModalVisible.value = true;
+    };
+
+    const sell = async () => {
+      try {
+        await axios.post("https://super-duper-waffle-g5wxrvqqrppfwx9r-8080.app.github.dev/sell", {
+          buy_ids: [sellTarget.value.id],
+          weight: Number(sellTarget.value.weight),
+          price: Number(sellTarget.value.price)
+        });
+        alert("卖出成功");
+        sellModalVisible.value = false;
+        fetchTrades();
+      } catch (e) {
+        alert("卖出失败: " + (e.response?.data?.error || e.message));
+      }
+    };
+
+    onMounted(fetchTrades);
+
+    return {
+      response,
+      buyData,
+      sellModalVisible,
+      sellForm,
+      sellTarget,
+      buy,
+      sell,
+      openSellModal
+    };
+  }
+}).mount("#app");
+</script>
+</body>
+</html>
